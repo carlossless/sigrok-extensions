@@ -1,5 +1,5 @@
 {
-  description = "Sigrok tools (pulseview, dsview) with custom protocol decoders";
+  description = "DSView with custom protocol decoders";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -14,18 +14,6 @@
         # Custom decoders from this repository
         customDecoders = ./decoders;
 
-        # Override libsigrokdecode to include custom decoders
-        libsigrokdecode-custom = pkgs.libsigrokdecode.overrideAttrs (oldAttrs: {
-          postInstall = (oldAttrs.postInstall or "") + ''
-            cp -r ${customDecoders}/* $out/share/libsigrokdecode/decoders/
-          '';
-        });
-
-        # Pulseview with custom libsigrokdecode
-        pulseview-custom = pkgs.pulseview.override {
-          libsigrokdecode = libsigrokdecode-custom;
-        };
-
         # DSView with custom decoders patched into the source
         dsview-custom = pkgs.dsview.overrideAttrs (oldAttrs: {
           postPatch = (oldAttrs.postPatch or "") + ''
@@ -35,7 +23,6 @@
       in
       {
         packages = {
-          pulseview = pulseview-custom;
           dsview = dsview-custom;
           default = dsview-custom;
         };
