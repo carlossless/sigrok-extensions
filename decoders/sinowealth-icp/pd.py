@@ -68,6 +68,7 @@ class Decoder(srd.Decoder):
         self.have_tms = None
         self.in_sync = False
         self.last_tck_sample = -1
+        self.byte_timeout_samples = None  # Will be set when samplerate is known
 
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
@@ -75,6 +76,8 @@ class Decoder(srd.Decoder):
     def metadata(self, key, value):
         if key == srd.SRD_CONF_SAMPLERATE:
             self.samplerate = value
+            # 100us timeout in samples
+            self.byte_timeout_samples = int(self.samplerate * 100e-6)
 
     def put_tdi(self, ss, es, data):
         self.put(ss, es, self.out_ann, [0, ['@%02X' % data]])
@@ -144,6 +147,16 @@ class Decoder(srd.Decoder):
 
         while True:
             (tck, tdi, tdo, tms) = self.wait(wait_cond)
+
+            # Check for timeout during byte reception (>100us between clocks)
+            if self.bitcount > 0 and self.last_tck_sample >= 0:
+                if self.byte_timeout_samples and (self.samplenum - self.last_tck_sample) > self.byte_timeout_samples:
+                    # Timeout - discard partial byte and start fresh
+                    self.bitcount = 0
+                    self.tdi_data = 0
+                    self.tdo_data = 0
+
+            self.last_tck_sample = self.samplenum
 
             # Handle the bit/sync clock
             self.handle_bit(tdi, tdo if self.have_tdo else 0, tck)
